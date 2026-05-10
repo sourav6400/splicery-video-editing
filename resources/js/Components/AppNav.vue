@@ -3,6 +3,7 @@ import { ref, onMounted, onUnmounted } from 'vue';
 
 const open = ref(false);
 const scrolled = ref(false);
+const activeHash = ref('');
 
 const links = [
     { href: '#work', label: 'Work' },
@@ -12,17 +13,58 @@ const links = [
     { href: '#faq', label: 'FAQ' },
 ];
 
-const onScroll = () => {
+const HEADER_ACTIVE_OFFSET = 96;
+
+function syncActiveSection() {
+    const ordered = links
+        .map((link) => {
+            const el = document.getElementById(link.href.slice(1));
+            return el ? { href: link.href, el } : null;
+        })
+        .filter(Boolean)
+        .sort(
+            (a, b) =>
+                a.el.getBoundingClientRect().top +
+                window.scrollY -
+                (b.el.getBoundingClientRect().top + window.scrollY),
+        );
+
+    let current = '';
+    for (const { href, el } of ordered) {
+        const { top } = el.getBoundingClientRect();
+        if (top <= HEADER_ACTIVE_OFFSET) {
+            current = href;
+        }
+    }
+    activeHash.value = current;
+}
+
+function onScroll() {
     scrolled.value = window.scrollY > 24;
-};
+    syncActiveSection();
+}
+
+function onHashChange() {
+    const h = window.location.hash;
+    if (h && links.some((l) => l.href === h)) {
+        activeHash.value = h;
+    } else {
+        syncActiveSection();
+    }
+}
 
 onMounted(() => {
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('hashchange', onHashChange);
     onScroll();
+    if (window.location.hash && links.some((l) => l.href === window.location.hash)) {
+        activeHash.value = window.location.hash;
+    }
 });
 
 onUnmounted(() => {
     window.removeEventListener('scroll', onScroll);
+    window.removeEventListener('hashchange', onHashChange);
 });
 </script>
 
@@ -48,7 +90,13 @@ onUnmounted(() => {
                     v-for="link in links"
                     :key="link.href"
                     :href="link.href"
-                    class="px-4 py-2 text-sm text-neutral-300 hover:text-white rounded-full hover:bg-white/5 transition"
+                    :aria-current="activeHash === link.href ? 'true' : undefined"
+                    :class="[
+                        'px-4 py-2 text-sm rounded-full transition',
+                        activeHash === link.href
+                            ? 'text-white font-medium bg-white/10'
+                            : 'text-neutral-300 hover:text-white hover:bg-white/5',
+                    ]"
                 >
                     {{ link.label }}
                 </a>
@@ -83,7 +131,13 @@ onUnmounted(() => {
                     :key="link.href"
                     :href="link.href"
                     @click="open = false"
-                    class="block px-4 py-3 text-neutral-200 hover:bg-white/5 rounded-lg"
+                    :aria-current="activeHash === link.href ? 'true' : undefined"
+                    :class="[
+                        'block px-4 py-3 rounded-lg',
+                        activeHash === link.href
+                            ? 'text-white font-medium bg-white/10'
+                            : 'text-neutral-200 hover:bg-white/5',
+                    ]"
                 >
                     {{ link.label }}
                 </a>
